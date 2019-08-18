@@ -16,7 +16,7 @@ const (
 // getMessageTimeDuration returns the duration of message derived from required msgs/second.
 func getMessageTimeDuration(msgs float64) time.Duration {
 	T := 1.0 / msgs
-	timeString := strconv.FormatFloat(T, 'G', -1, 64) + "s"
+	timeString := strconv.FormatFloat(T, 'f', -1, 64) + "s"
 
 	duration, _ := time.ParseDuration(timeString)
 	return duration
@@ -34,6 +34,8 @@ func newSinkConnection(hostname string, port string, typ string) Sinks.MessageSi
 		sinkConn = new(Sinks.TCPSink)
 	} else if typ == "udp" {
 		sinkConn = new(Sinks.UDPSink)
+	} else if typ == "mqtt" {
+		sinkConn = new(Sinks.MQTTSink)
 	}
 
 	sinkConn.InitiateConnection(hostname, port)

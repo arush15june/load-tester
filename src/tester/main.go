@@ -52,7 +52,7 @@ var (
 	PayloadSize = flag.Int("payload", 64, "Payload size in bytes.")
 
 	// SinkType is the type of sink required on hostname:port.
-	SinkType = flag.String("sink", "tcp", "Sink required. [tcp, udp]")
+	SinkType = flag.String("sink", "tcp", "Sink required. [tcp, udp, mqtt]")
 
 	// Timer is the duration to run the tester for.
 	Timer = flag.Duration("duration", 0, "Duration to run for. 0 for inifite.")
@@ -80,10 +80,15 @@ func messageRoutine(hostname string, port string, sinktype string) {
 
 	for {
 		start := time.Now()
-		sinkConnection.SendPayload(Payload)
+		err := sinkConnection.SendPayload(Payload)
+		if err != nil {
+			fmt.Println(err.Error())
+			break
+		}
 
 		time.Sleep(MessageTime - time.Since(start))
 	}
+	fmt.Printf("Clossing %v connection to %v:%v\n", sinkConnection, hostname, port)
 	sinkConnection.CloseConnection()
 }
 

@@ -36,13 +36,13 @@ go build src/main.go
 - **-port** string
     - Port of sink. (default "18000")
 - **-sink** string
-    - Sink required. [tcp, udp] (default "tcp")
+    - Sink required. [tcp, udp, mqtt] (default "tcp")
 - **-noexec** bool
         Don't execute.
+
 # TODO
 - Better logging and metrics.
 - More Sinks!
-- MQTT Sink
 - Kafka Sink
 - RabbitMQ Sink
 - NATS Sink
