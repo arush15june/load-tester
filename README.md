@@ -18,6 +18,24 @@ Parallel load tester for networked services. Send a cosntant amount of messages 
     - Sleep(T - Tsend)
 ```
 
+# Usage
+```bash
+go build src/main.go
+./main -h
+```
+
+## Flags
+- **-devices** int
+    - Number of devices/connections. (default 1)
+- **-hostname** string
+    - Hostname of sink. (default "127.0.0.1")
+- **-msg** float
+    - Number of messages per second. (default 2)
+- **-payload** int
+    - Payload size in bytes. (default 64)
+- **-port** string
+    - Port of sink. (default "18000")
+
 # TODO
 - Better logging and metrics.
 - More Sinks!
@@ -26,3 +44,4 @@ Parallel load tester for networked services. Send a cosntant amount of messages 
 - Kafka Sink
 - RabbitMQ Sink
 - NATS Sink
+- Research clock resolution, maximum feasible messages/second.
