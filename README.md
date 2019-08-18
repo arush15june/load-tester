@@ -11,11 +11,11 @@ Parallel load tester for networked services. Send a cosntant amount of messages 
 - For every device, Initialize a goroutine,
 - Inside goroutine
   - Initiate Connection.
-- On Every Iteratioin
-  - Start timing.
-    - SendPayload(Payload)
-  - Stop Timing => Tsend.
-  - Sleep(T - Tsend)
+  - On Every Iteratioin
+    - Start timing.
+      - SendPayload(Payload)
+    - Stop Timing => Tsend.
+    - Sleep(T - Tsend)
 ```
 
 # TODO
