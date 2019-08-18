@@ -28,8 +28,8 @@ import (
 
 // Global Variables
 var (
-	waiter  sync.WaitGroup
-	msgRate uint64
+	waiter     sync.WaitGroup
+	msgRateArr []uint64
 )
 
 // Argument Flags
@@ -59,6 +59,9 @@ var (
 
 	// Timer is the duration to run the tester for.
 	NoExecute = flag.Bool("noexec", false, "Don't execute.")
+
+	// UpdateRate is the update rate for printing log messages.
+	UpdateRate = flag.Duration("update", 100*time.Millisecond, "Message rate log rate. Faster update might affect performance.")
 )
 
 // Derived constants.
@@ -71,47 +74,82 @@ var (
 )
 
 // messageRoutine follows the timing algorithm for sending a constant rate of messages.
-func messageRoutine(hostname string, port string, sinktype string) {
+func messageRoutine(hostname string, port string, sinktype string, localMsgRateVar *uint64) {
 	defer waiter.Done()
 
+	var sendErr error
+	var start time.Time
+	var sentMsgAmt uint64
+
 	sinkConnection := newSinkConnection(hostname, port, sinktype)
-	fmt.Printf("Initiated new %v connection to %v:%v\n", sinkConnection, hostname, port)
-	atomic.AddUint64(&msgRate, uint64(*Messages))
+	// fmt.Printf("Initiated new %v connection to %v:%v\n", sinkConnection, hostname, port)
+
+	secondTimer := time.NewTimer(1 * time.Second)
 
 	for {
-		start := time.Now()
-		err := sinkConnection.SendPayload(Payload)
-		if err != nil {
-			fmt.Println(err.Error())
+		start = time.Now()
+		sendErr = sinkConnection.SendPayload(Payload)
+		if sendErr != nil {
+			fmt.Println(sendErr.Error())
+			atomic.StoreUint64(localMsgRateVar, 0)
 			break
+		}
+
+		sentMsgAmt += 1
+		select {
+		case <-secondTimer.C:
+			atomic.StoreUint64(localMsgRateVar, sentMsgAmt)
+			sentMsgAmt = 0
+			secondTimer.Reset(1 * time.Second)
+		default:
 		}
 
 		time.Sleep(MessageTime - time.Since(start))
 	}
-	fmt.Printf("Clossing %v connection to %v:%v\n", sinkConnection, hostname, port)
+	fmt.Printf("Closing %v connection to %v:%v\n", sinkConnection, hostname, port)
 	sinkConnection.CloseConnection()
 }
 
-func deploySink(hostname string, port string, sinktype string) {
+func deploySink(hostname string, port string, sinktype string, localMsgRateVar *uint64) {
 	waiter.Add(1)
-	go messageRoutine(hostname, port, sinktype)
+	go messageRoutine(hostname, port, sinktype, localMsgRateVar)
 }
 
 func main() {
 	flag.Parse()
 
+	totalDevices := *Devices
+	totalMessagePerSecond := *Messages * float64(totalDevices)
+	msgLogUpdateRate := *UpdateRate
+
 	MessageTime = getMessageTimeDuration(*Messages)
 	Payload = generatePayload(*PayloadSize)
+	msgRateArr = make([]uint64, totalDevices)
 
-	fmt.Printf("Messages per second: %f/s\n", *Messages)
+	fmt.Printf("Messages per device per second: %f/s\n", *Messages)
+	fmt.Printf("Total messages per second: %f/s\n", totalMessagePerSecond)
 	fmt.Printf("Message Delta: %v\n", MessageTime)
 	fmt.Printf("Payload Size: %v bytes\n", *PayloadSize)
 
 	if !*NoExecute {
-		for i := 0; i < *Devices; i++ {
-			deploySink(*Hostname, *Port, *SinkType)
+		for i := 0; i < totalDevices; i++ {
+			routineMsgRateVar := &msgRateArr[i]
+			deploySink(*Hostname, *Port, *SinkType, routineMsgRateVar)
 		}
 	}
+
+	go func() {
+		for {
+			var sum uint64 = 0
+			for _, num := range msgRateArr {
+				sum += num
+			}
+			fmt.Print("Message Rate: ")
+			fmt.Printf("%v msg/s", sum)
+			fmt.Printf("\r")
+			time.Sleep(msgLogUpdateRate)
+		}
+	}()
 
 	waiter.Wait()
 }

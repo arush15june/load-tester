@@ -39,6 +39,8 @@ go build src/main.go
     - Sink required. [tcp, udp, mqtt] (default "tcp")
 - **-noexec** bool
         Don't execute.
+- **-update** duration
+        Message rate log rate.
 
 # TODO
 - Better logging and metrics.
@@ -48,6 +50,5 @@ go build src/main.go
 - NATS Sink
 - Research clock resolution, maximum feasible messages/second.
 - Fixed duration testing.
-- Real time message rate monitoring.
 - Message/sec/routine limit acc to clock resolution.
 - Better error handling (Graceful Connection Close).
