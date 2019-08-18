@@ -42,7 +42,7 @@ var (
 // Argument Flags
 var (
 	// Devices is the number of concurrent devices/connections
-	// T in algorithm.
+	// N in algorithm.
 	Devices = flag.Int("devices", 1, "Number of devices/connections.")
 
 	// Messages is the number of messages per second.
