@@ -1,6 +1,6 @@
 # load-tester
 
-Parallel load tester for networked services. Send a constant amount of messages per second accros concurrent connections.
+Parallel load tester for networked services. Send a constant amount of messages per second across concurrent connections.
 
 # Algorithm
 ```
