@@ -35,15 +35,19 @@ go build src/main.go
     - Payload size in bytes. (default 64)
 - **-port** string
     - Port of sink. (default "18000")
-
+- **-sink** string
+    - Sink required. [tcp, udp] (default "tcp")
+- **-noexec** bool
+        Don't execute.
 # TODO
 - Better logging and metrics.
 - More Sinks!
-- UDP Sink
 - MQTT Sink
 - Kafka Sink
 - RabbitMQ Sink
 - NATS Sink
 - Research clock resolution, maximum feasible messages/second.
+- Fixed duration testing.
 - Real time message rate monitoring.
 - Message/sec/routine limit acc to clock resolution.
+- Better error handling (Graceful Connection Close).

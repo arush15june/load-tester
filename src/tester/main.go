@@ -99,7 +99,7 @@ func main() {
 	Payload = generatePayload(*PayloadSize)
 
 	fmt.Printf("Messages per second: %f/s\n", *Messages)
-	fmt.Printf("Message Delta: %v\n", MessageTime.Nanoseconds()
+	fmt.Printf("Message Delta: %v\n", MessageTime)
 	fmt.Printf("Payload Size: %v bytes\n", *PayloadSize)
 
 	if !*NoExecute {
