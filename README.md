@@ -45,3 +45,5 @@ go build src/main.go
 - RabbitMQ Sink
 - NATS Sink
 - Research clock resolution, maximum feasible messages/second.
+- Real time message rate monitoring.
+- Message/sec/routine limit acc to clock resolution.

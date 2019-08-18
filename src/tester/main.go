@@ -21,22 +21,15 @@ package main
 import (
 	"flag"
 	"fmt"
-	"strconv"
-	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
-
-	Sinks "github.com/arush15june/load-tester/src/sinks"
-)
-
-// Constants
-const (
-	PayloadSymbol = "A"
 )
 
 // Global Variables
 var (
-	waiter sync.WaitGroup
+	waiter  sync.WaitGroup
+	msgRate uint64
 )
 
 // Argument Flags
@@ -57,6 +50,15 @@ var (
 
 	// PayloadSize is the size of the payload to sink.
 	PayloadSize = flag.Int("payload", 64, "Payload size in bytes.")
+
+	// SinkType is the type of sink required on hostname:port.
+	SinkType = flag.String("sink", "tcp", "Sink required. [tcp, udp]")
+
+	// Timer is the duration to run the tester for.
+	Timer = flag.Duration("duration", 0, "Duration to run for. 0 for inifite.")
+
+	// Timer is the duration to run the tester for.
+	NoExecute = flag.Bool("noexec", false, "Don't execute.")
 )
 
 // Derived constants.
@@ -68,30 +70,13 @@ var (
 	Payload []byte
 )
 
-func getMessageTimeDuration(msgs float64) time.Duration {
-	T := 1.0 / msgs
-	timeString := strconv.FormatFloat(T, 'g', -1, 64) + "s"
-
-	duration, _ := time.ParseDuration(timeString)
-	return duration
-}
-
-func generatePayload(size int) []byte {
-	return []byte(strings.Repeat(PayloadSymbol, size-1) + "\n")
-}
-
-func newSinkConnection(hostname string, port string) Sinks.MessageSink {
-	sinkConn := new(Sinks.TCPSink)
-	sinkConn.InitiateConnection(hostname, port)
-
-	return sinkConn
-}
-
-func messageRoutine(hostname string, port string) {
+// messageRoutine follows the timing algorithm for sending a constant rate of messages.
+func messageRoutine(hostname string, port string, sinktype string) {
 	defer waiter.Done()
 
-	fmt.Printf("Iniating new connection to %v:%v\n", hostname, port)
-	sinkConnection := newSinkConnection(hostname, port)
+	sinkConnection := newSinkConnection(hostname, port, sinktype)
+	fmt.Printf("Initiated new %v connection to %v:%v\n", sinkConnection, hostname, port)
+	atomic.AddUint64(&msgRate, uint64(*Messages))
 
 	for {
 		start := time.Now()
@@ -102,19 +87,25 @@ func messageRoutine(hostname string, port string) {
 	sinkConnection.CloseConnection()
 }
 
+func deploySink(hostname string, port string, sinktype string) {
+	waiter.Add(1)
+	go messageRoutine(hostname, port, sinktype)
+}
+
 func main() {
 	flag.Parse()
 
 	MessageTime = getMessageTimeDuration(*Messages)
 	Payload = generatePayload(*PayloadSize)
 
-	fmt.Printf("Messages per second: %fs\n", *Messages)
-	fmt.Printf("Message Delta: %v\n", MessageTime)
+	fmt.Printf("Messages per second: %f/s\n", *Messages)
+	fmt.Printf("Message Delta: %v\n", MessageTime.Nanoseconds()
 	fmt.Printf("Payload Size: %v bytes\n", *PayloadSize)
 
-	for i := 0; i < *Devices; i++ {
-		waiter.Add(1)
-		go messageRoutine(*Hostname, *Port)
+	if !*NoExecute {
+		for i := 0; i < *Devices; i++ {
+			deploySink(*Hostname, *Port, *SinkType)
+		}
 	}
 
 	waiter.Wait()
