@@ -4,15 +4,15 @@ package main
 //
 // 	Model load via N devices (connections) with each sending N msg/s.
 //
-// 	Algorithm
-// 	- N = number of devices
-// 	- msg = number of messages per second.
-// 	- T = 1/msg -> Time taken by 1 message to guarantee msg msgs/second.
-// 	- Payload = Payload in memory. (bytes)
-// 	- For every device, Initialize a goroutine,
-// 	- Inside goroutine
+// Algorithm
+// - N = number of devices
+// - msg = number of messages per second.
+// - T = 1/msg -> Time taken by 1 message to guarantee msg msgs/second.
+// - Payload = Payload in memory. (bytes)
+// - For every device, Initialize a goroutine,
+// - Inside goroutine
 // 		- Initiate Connection.
-//  	- On Every Iteratioin
+// 		- On Every Iteratioin
 // 			- Start timing.
 // 				- SendPayload(Payload)
 // 			- Stop Timing => Tsend.
@@ -110,7 +110,7 @@ func main() {
 
 	fmt.Printf("Messages per second: %fs\n", *Messages)
 	fmt.Printf("Message Delta: %v\n", MessageTime)
-	fmt.Printf("Paylod Size: %d bytes\n", PayloadSize)
+	fmt.Printf("Payload Size: %v bytes\n", *PayloadSize)
 
 	for i := 0; i < *Devices; i++ {
 		waiter.Add(1)
