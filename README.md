@@ -25,30 +25,33 @@ go build src/main.go
 ```
 
 ## Flags
-- **-devices** int
-    - Number of devices/connections. (default 1)
-- **-hostname** string
-    - Hostname of sink. (default "127.0.0.1")
-- **-msg** float
-    - Number of messages per second. (default 2)
-- **-payload** int
-    - Payload size in bytes. (default 64)
-- **-port** string
-    - Port of sink. (default "18000")
-- **-sink** string
-    - Sink required. [tcp, udp, mqtt] (default "tcp")
-- **-noexec** bool
+  -**devices** int
+        Number of devices/connections. (default 1)
+  -**duration** duration
+        Duration to run for. 0 for inifite. (default 2s)      
+  -**hostname** string
+        Hostname of sink. (default "127.0.0.1")
+  -**msg** float
+        Number of messages per second. (default 2)
+  -**noexec**
         Don't execute.
-- **-update** duration
-        Message rate log rate.
+  -**payload** int
+        Payload size in bytes. (default 64)
+  -**port** string
+        Port of sink. (default "18000")
+  -**sink** string
+        Sink required. [tcp, udp, mqtt] (default "tcp")       
+  -**update** duration
+        Message rate log frequency. Faster update might affect performance. (default 1s)
+  -**verbose**
+        Verbose mode logging.
 
 # TODO
-- Better logging and metrics.
 - More Sinks!
 - Kafka Sink
 - RabbitMQ Sink
 - NATS Sink
 - Research clock resolution, maximum feasible messages/second.
-- Fixed duration testing.
 - Message/sec/routine limit acc to clock resolution.
-- Better error handling (Graceful Connection Close).
+- Better error handling (dont panic on no connection)
+- Distributed load testing.

@@ -19,52 +19,45 @@ package main
 // 			- Sleep(T - Tsend)
 
 import (
-	"flag"
 	"fmt"
+	"log"
+	"os"
 	"sync"
 	"sync/atomic"
 	"time"
 )
 
+// Logger
+var (
+	infoLogger = log.New(os.Stdout, "INFO: ", log.Ldate|log.Ltime)
+	LogInfo    = func(data string) {
+		infoLogger.Output(2, data)
+	}
+
+	warnLogger = log.New(os.Stdout, "WARNING: ", log.Ldate|log.Ltime)
+	LogWarn    = func(data string) {
+		warnLogger.Output(2, data)
+	}
+
+	debugLogger = log.New(os.Stdout, "DEBUG: ", log.Ldate|log.Ltime)
+	LogDebug    = func(data string) {
+		fmt.Println(data)
+		if *Verbose {
+			debugLogger.Output(2, data)
+		}
+	}
+)
+
 // Global Variables
 var (
-	waiter     sync.WaitGroup
-	msgRateArr []uint64
+	finishWaiter      sync.WaitGroup
+	inititationWaiter sync.WaitGroup
+	msgRateArr        []uint64
+	totalMsgSentArr   []uint64
+	exitChanList      []chan bool
 )
 
-// Argument Flags
-var (
-	// Devices is the number of concurrent devices/connections
-	// N in algorithm.
-	Devices = flag.Int("devices", 1, "Number of devices/connections.")
-
-	// Messages is the number of messages per second.
-	// msg in algorithm.
-	Messages = flag.Float64("msg", 2, "Number of messages per second.")
-
-	// Hostname is the hostname of the sink
-	Hostname = flag.String("hostname", "127.0.0.1", "Hostname of sink.")
-
-	// Port is the port of the sink.
-	Port = flag.String("port", "18000", "Port of sink.")
-
-	// PayloadSize is the size of the payload to sink.
-	PayloadSize = flag.Int("payload", 64, "Payload size in bytes.")
-
-	// SinkType is the type of sink required on hostname:port.
-	SinkType = flag.String("sink", "tcp", "Sink required. [tcp, udp, mqtt]")
-
-	// Timer is the duration to run the tester for.
-	Timer = flag.Duration("duration", 0, "Duration to run for. 0 for inifite.")
-
-	// Timer is the duration to run the tester for.
-	NoExecute = flag.Bool("noexec", false, "Don't execute.")
-
-	// UpdateRate is the update rate for printing log messages.
-	UpdateRate = flag.Duration("update", 100*time.Millisecond, "Message rate log rate. Faster update might affect performance.")
-)
-
-// Derived constants.
+// Derived variables.
 var (
 	// MessageTime is T in the algorithm.
 	MessageTime time.Duration
@@ -74,19 +67,37 @@ var (
 )
 
 // messageRoutine follows the timing algorithm for sending a constant rate of messages.
-func messageRoutine(hostname string, port string, sinktype string, localMsgRateVar *uint64) {
-	defer waiter.Done()
+func messageRoutine(hostname string, port string, sinktype string, localMsgRateVar *uint64, totalMsgSentVar *uint64, exitChan chan bool) {
+	inititationWaiter.Add(1)
+	finishWaiter.Add(1)
 
 	var sendErr error
 	var start time.Time
 	var sentMsgAmt uint64
+	var exitVal bool = false
 
 	sinkConnection := newSinkConnection(hostname, port, sinktype)
-	// fmt.Printf("Initiated new %v connection to %v:%v\n", sinkConnection, hostname, port)
+	LogDebug(fmt.Sprintf("Initiated new %v connection to %v:%v\n", sinkConnection, hostname, port))
 
-	secondTimer := time.NewTimer(1 * time.Second)
+	secondRateTime := time.NewTimer(1 * time.Second)
+
+	inititationWaiter.Done()
+	inititationWaiter.Wait()
 
 	for {
+		select {
+		case <-secondRateTime.C:
+			atomic.StoreUint64(localMsgRateVar, sentMsgAmt)
+			sentMsgAmt = 0
+			secondRateTime.Reset(1 * time.Second)
+		case exitVal = <-exitChan:
+		default:
+		}
+
+		if exitVal {
+			break
+		}
+
 		start = time.Now()
 		sendErr = sinkConnection.SendPayload(Payload)
 		if sendErr != nil {
@@ -95,28 +106,24 @@ func messageRoutine(hostname string, port string, sinktype string, localMsgRateV
 			break
 		}
 
-		sentMsgAmt += 1
-		select {
-		case <-secondTimer.C:
-			atomic.StoreUint64(localMsgRateVar, sentMsgAmt)
-			sentMsgAmt = 0
-			secondTimer.Reset(1 * time.Second)
-		default:
-		}
+		sentMsgAmt++
+		atomic.AddUint64(totalMsgSentVar, 1)
 
 		time.Sleep(MessageTime - time.Since(start))
 	}
-	fmt.Printf("Closing %v connection to %v:%v\n", sinkConnection, hostname, port)
+	LogDebug(fmt.Sprintf("Closing %v connection to %v:%v\n", sinkConnection, hostname, port))
 	sinkConnection.CloseConnection()
+
+	finishWaiter.Done()
 }
 
-func deploySink(hostname string, port string, sinktype string, localMsgRateVar *uint64) {
-	waiter.Add(1)
-	go messageRoutine(hostname, port, sinktype, localMsgRateVar)
+// deploySink adds an entry to the WaitGroup and deploys the selected sink.
+func deploySink(hostname string, port string, sinktype string, localMsgRateVar *uint64, totalMsgSentVar *uint64, routineExitChanVar chan bool) {
+	go messageRoutine(hostname, port, sinktype, localMsgRateVar, totalMsgSentVar, routineExitChanVar)
 }
 
 func main() {
-	flag.Parse()
+	ParseFlags()
 
 	totalDevices := *Devices
 	totalMessagePerSecond := *Messages * float64(totalDevices)
@@ -125,31 +132,69 @@ func main() {
 	MessageTime = getMessageTimeDuration(*Messages)
 	Payload = generatePayload(*PayloadSize)
 	msgRateArr = make([]uint64, totalDevices)
+	totalMsgSentArr = make([]uint64, totalDevices)
+	exitChanList = make([]chan bool, totalDevices)
+	for i := range exitChanList {
+		exitChanList[i] = make(chan bool)
+	}
 
-	fmt.Printf("Messages per device per second: %f/s\n", *Messages)
-	fmt.Printf("Total messages per second: %f/s\n", totalMessagePerSecond)
-	fmt.Printf("Message Delta: %v\n", MessageTime)
-	fmt.Printf("Payload Size: %v bytes\n", *PayloadSize)
+	LogInfo(fmt.Sprintf("Messages per device per second: %f/s\n", *Messages))
+	LogInfo(fmt.Sprintf("Total messages per second: %f/s\n", totalMessagePerSecond))
+	LogInfo(fmt.Sprintf("Message Delta: %v\n", MessageTime))
+	LogInfo(fmt.Sprintf("Payload Size: %v bytes\n", *PayloadSize))
+	LogInfo(fmt.Sprintf("Run Timer: %v\n", *Timer))
 
+	LogInfo(fmt.Sprintf("Ramping up %d workers.\n", totalDevices))
 	if !*NoExecute {
-		for i := 0; i < totalDevices; i++ {
+		for i := range exitChanList {
 			routineMsgRateVar := &msgRateArr[i]
-			deploySink(*Hostname, *Port, *SinkType, routineMsgRateVar)
+			routineExitChanVar := exitChanList[i]
+			routineMsgSentVar := &totalMsgSentArr[i]
+			deploySink(*Hostname, *Port, *SinkType, routineMsgRateVar, routineMsgSentVar, routineExitChanVar)
 		}
 	}
 
-	go func() {
+	inititationWaiter.Wait()
+	LogInfo(fmt.Sprintf("Started %d workers.\n", totalDevices))
+
+	updateExitSignalChan := make(chan bool)
+	go func(signalChan chan bool) {
+		var exitVal = false
 		for {
+			select {
+			case exitVal = <-signalChan:
+			default:
+			}
+
+			if exitVal {
+				break
+			}
+
 			var sum uint64 = 0
 			for _, num := range msgRateArr {
 				sum += num
 			}
-			fmt.Print("Message Rate: ")
-			fmt.Printf("%v msg/s", sum)
-			fmt.Printf("\r")
+			LogInfo(fmt.Sprintf("Message Rate: %v msg/s\n", sum))
+
 			time.Sleep(msgLogUpdateRate)
 		}
-	}()
+	}(updateExitSignalChan)
 
-	waiter.Wait()
+	exitTimer := time.NewTimer(*Timer)
+	select {
+	case <-exitTimer.C:
+		updateExitSignalChan <- true
+		for chanIndex := range exitChanList {
+			exitChanList[chanIndex] <- true
+		}
+		LogInfo("Timer finish.")
+	}
+
+	finishWaiter.Wait()
+
+	var msgSum uint64 = 0
+	for i := range totalMsgSentArr {
+		msgSum += totalMsgSentArr[i]
+	}
+	LogInfo(fmt.Sprintf("Total messages sent: %v\n", msgSum))
 }
