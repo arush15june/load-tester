@@ -20,7 +20,7 @@ Parallel load tester for networked services. Send a constant amount of messages 
 
 # Usage
 ```bash
-go build src/main.go
+go build src/tester/main.go
 ./main -h
 ```
 
