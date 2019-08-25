@@ -25,26 +25,26 @@ go build src/main.go
 ```
 
 ## Flags
-  -**devices** int
-        Number of devices/connections. (default 1)
-  -**duration** duration
-        Duration to run for. 0 for inifite. (default 2s)      
-  -**hostname** string
-        Hostname of sink. (default "127.0.0.1")
-  -**msg** float
-        Number of messages per second. (default 2)
-  -**noexec**
-        Don't execute.
-  -**payload** int
-        Payload size in bytes. (default 64)
-  -**port** string
-        Port of sink. (default "18000")
-  -**sink** string
-        Sink required. [tcp, udp, mqtt] (default "tcp")       
-  -**update** duration
-        Message rate log frequency. Faster update might affect performance. (default 1s)
-  -**verbose**
-        Verbose mode logging.
+  - **devices** int
+      - Number of devices/connections. (default 1)
+  - **duration** duration
+      - Duration to run for. 0 for inifite. (default 2s)      
+  - **hostname** string
+      - Hostname of sink. (default "127.0.0.1")
+  - **msg** float
+      - Number of messages per second. (default 2)
+  - **noexec**
+      - Don't execute.
+  - **payload** int
+      - Payload size in bytes. (default 64)
+  - **port** string
+      - Port of sink. (default "18000")
+  - **sink** string
+      - Sink required. [tcp, udp, mqtt] (default "tcp")       
+  - **update** duration
+      - Message rate log frequency. Faster update might affect performance. (default 1s)
+  - **verbose**
+      - Verbose mode logging.
 
 # TODO
 - More Sinks!
