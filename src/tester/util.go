@@ -28,7 +28,7 @@ func generatePayload(size int) []byte {
 }
 
 // newSinkConnnection creates a new Sinks.MessageSink
-func newSinkConnection(hostname string, port string, typ string) Sinks.MessageSink {
+func newSinkConnection(hostname string, port string, typ string) (Sinks.MessageSink, error) {
 	var sinkConn Sinks.MessageSink
 	if typ == "tcp" {
 		sinkConn = new(Sinks.TCPSink)
@@ -38,7 +38,7 @@ func newSinkConnection(hostname string, port string, typ string) Sinks.MessageSi
 		sinkConn = new(Sinks.MQTTSink)
 	}
 
-	sinkConn.InitiateConnection(hostname, port)
+	err := sinkConn.InitiateConnection(hostname, port)
 
-	return sinkConn
+	return sinkConn, err
 }

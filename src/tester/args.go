@@ -30,7 +30,7 @@ var (
 	// Timer is the duration to run the tester for.
 	Timer = flag.Duration("duration", 2*time.Second, "Duration to run for. 0 for inifite.")
 
-	// Timer is the duration to run the tester for.
+	// No executes prints derived parameters and does not execute the tester.
 	NoExecute = flag.Bool("noexec", false, "Don't execute.")
 
 	// UpdateRate is the update rate for printing log messages.

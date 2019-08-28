@@ -41,7 +41,6 @@ var (
 
 	debugLogger = log.New(os.Stdout, "DEBUG: ", log.Ldate|log.Ltime)
 	LogDebug    = func(data string) {
-		fmt.Println(data)
 		if *Verbose {
 			debugLogger.Output(2, data)
 		}
@@ -56,6 +55,57 @@ var (
 	totalMsgSentArr   []uint64
 	exitChanList      []chan bool
 )
+
+// Tester is the container for load tester state.
+type Tester struct {
+	// State Variables
+
+	// finishWaiter is the WaitGroup for completion of message goroutines.
+	finishWaiter sync.WaitGroup
+
+	// initiationWaiter is the WaitGroup for the ramp up of connections in message goroutines.
+	inititationWaiter sync.WaitGroup
+
+	// MsgRateArr is the array of message rates of individual goroutines.
+	MsgRateArr []uint64
+
+	// TotalMsgSentArr is the array containing total counts of messages sent by individual goroutines.
+	TotalMsgSentArr []uint64
+
+	// ExitChanList is the list of channels for signaling individual goroutines.
+	ExitChanList []chan bool
+
+	// Parameters
+
+	// totalDevices is the total amount of concurrent connecting goroutines.
+	totalDevices int
+
+	// Hostname is the hostname of the sink
+	Hostname string
+
+	// Port is the port of the sink.
+	Port string
+
+	// Timer is the duration to run the tester for.
+	Timer time.Duration
+
+	// UpdateRate is the update rate for printing log messages.
+	UpdateRate time.Duration
+
+	// PayloadSize is the size of the payload.
+	PayloadSize int
+
+	// Derived Variables
+
+	// MessageTime is the time for which each itearr
+	MessageTime time.Duration
+
+	// Payload is the payload of the load tester.
+	Payload []byte
+
+	// totalMessagePerSecond is the total messages per second guranteed to be sent by all devices.
+	totalMessagePerSecond int
+}
 
 // Derived variables.
 var (
@@ -74,28 +124,34 @@ func messageRoutine(hostname string, port string, sinktype string, localMsgRateV
 	var sendErr error
 	var start time.Time
 	var sentMsgAmt uint64
-	var exitVal bool = false
+	var exitVal = false
 
-	sinkConnection := newSinkConnection(hostname, port, sinktype)
-	LogDebug(fmt.Sprintf("Initiated new %v connection to %v:%v\n", sinkConnection, hostname, port))
+	sinkConnection, err := newSinkConnection(hostname, port, sinktype)
+	if err != nil {
+		LogDebug(fmt.Sprintf("Failed initiating %v connection to %v:%v", sinkConnection, hostname, port))
+		inititationWaiter.Done()
+		finishWaiter.Done()
+
+		return
+	}
+
+	LogDebug(fmt.Sprintf("Initiated new %v connection to %v:%v", sinkConnection, hostname, port))
 
 	secondRateTime := time.NewTimer(1 * time.Second)
 
 	inititationWaiter.Done()
 	inititationWaiter.Wait()
-
 	for {
 		select {
+		case <-time.After(MessageTime - time.Since(start)):
 		case <-secondRateTime.C:
 			atomic.StoreUint64(localMsgRateVar, sentMsgAmt)
 			sentMsgAmt = 0
 			secondRateTime.Reset(1 * time.Second)
 		case exitVal = <-exitChan:
-		default:
-		}
-
-		if exitVal {
-			break
+			if exitVal {
+				break
+			}
 		}
 
 		start = time.Now()
@@ -108,8 +164,6 @@ func messageRoutine(hostname string, port string, sinktype string, localMsgRateV
 
 		sentMsgAmt++
 		atomic.AddUint64(totalMsgSentVar, 1)
-
-		time.Sleep(MessageTime - time.Since(start))
 	}
 	LogDebug(fmt.Sprintf("Closing %v connection to %v:%v\n", sinkConnection, hostname, port))
 	sinkConnection.CloseConnection()
@@ -120,6 +174,28 @@ func messageRoutine(hostname string, port string, sinktype string, localMsgRateV
 // deploySink adds an entry to the WaitGroup and deploys the selected sink.
 func deploySink(hostname string, port string, sinktype string, localMsgRateVar *uint64, totalMsgSentVar *uint64, routineExitChanVar chan bool) {
 	go messageRoutine(hostname, port, sinktype, localMsgRateVar, totalMsgSentVar, routineExitChanVar)
+}
+
+func logMessageRate(signalChan chan bool, msgLogUpdateRate *time.Duration) {
+	var exitVal = false
+	for {
+		select {
+		case exitVal = <-signalChan:
+		default:
+		}
+
+		if exitVal {
+			break
+		}
+
+		var sum uint64 = 0
+		for n, _ := range msgRateArr {
+			sum += atomic.LoadUint64(&msgRateArr[n])
+		}
+		infoLogger.Printf("Message Rate: %v msg/s", sum)
+
+		time.Sleep(*msgLogUpdateRate)
+	}
 }
 
 func main() {
@@ -158,36 +234,19 @@ func main() {
 	LogInfo(fmt.Sprintf("Started %d workers.\n", totalDevices))
 
 	updateExitSignalChan := make(chan bool)
-	go func(signalChan chan bool) {
-		var exitVal = false
-		for {
-			select {
-			case exitVal = <-signalChan:
-			default:
-			}
+	go logMessageRate(updateExitSignalChan, &msgLogUpdateRate)
 
-			if exitVal {
-				break
+	LogDebug(string(*Timer))
+	if *Timer > 0*time.Second {
+		exitTimer := time.NewTimer(*Timer)
+		select {
+		case <-exitTimer.C:
+			updateExitSignalChan <- true
+			for chanIndex := range exitChanList {
+				exitChanList[chanIndex] <- true
 			}
-
-			var sum uint64 = 0
-			for _, num := range msgRateArr {
-				sum += num
-			}
-			LogInfo(fmt.Sprintf("Message Rate: %v msg/s\n", sum))
-
-			time.Sleep(msgLogUpdateRate)
+			LogInfo("Timer finish.")
 		}
-	}(updateExitSignalChan)
-
-	exitTimer := time.NewTimer(*Timer)
-	select {
-	case <-exitTimer.C:
-		updateExitSignalChan <- true
-		for chanIndex := range exitChanList {
-			exitChanList[chanIndex] <- true
-		}
-		LogInfo("Timer finish.")
 	}
 
 	finishWaiter.Wait()
