@@ -18,6 +18,22 @@ Parallel load tester for networked services. Send a constant amount of messages 
     - Sleep(T - Tsend)
 ```
 
+## Design
+- Metrics interface
+  - Generic metrics interface.
+  - Concrete implementations for service metrics like Round Trip Times, HTTP Request Times, etc.
+  - metrics stored as key-values, exposed as mappings.
+  - Thread safe implmenetations to update via LoadTesters goroutines.
+  - serializable state, can also be used for comparison instead of holding state in LoadTester's.
+Ex. HTTP Metrics, TCP Metrics, UDP Metrics, MQTT Metrics, AMQP Metrics, etc.
+
+- LoadTester interface
+  - Implement load testing, generate metrics, handle timing.
+  - Concrete implementations for specific service testing and concrete metrics.
+  - Encompass concrete metrics and calculate metrics.
+  - Mediator in essence, for Sinks and Metrics.
+Ex. HTTPTester, TCPTester, UDPTester, MQTTTester, AMQPTester, etc.
+
 # Usage
 ```bash
 go build ./src/tester
@@ -51,6 +67,8 @@ go build ./src/tester
 - Kafka Sink
 - RabbitMQ Sink
 - NATS Sink
+- LoadTester and Metrics architecture.
+- Metrics for various services.
 - Research clock resolution, maximum feasible messages/second.
 - Message/sec/routine limit acc to clock resolution.
 - Better error handling (dont panic on no connection)
