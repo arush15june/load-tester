@@ -1,0 +1,1 @@
+go build -o %~dp0\bin\tester.exe %~dp0\src\tester
