@@ -4,7 +4,8 @@ import "net"
 
 // UDPSink is a message sink for a Connection.
 type UDPSink struct {
-	Conn net.Conn
+	Payload []byte
+	Conn    net.Conn
 }
 
 func (t *UDPSink) String() string {

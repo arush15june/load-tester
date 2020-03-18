@@ -1,4 +1,4 @@
-package main
+package args
 
 import (
 	"flag"
@@ -38,6 +38,8 @@ var (
 
 	// Verbose enables verbose logging.
 	Verbose = flag.Bool("verbose", false, "Verbose mode logging.")
+
+	Cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
 )
 
 // ParseFlags parses arg flags.

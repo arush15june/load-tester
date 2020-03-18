@@ -4,7 +4,8 @@ import "net"
 
 // TCPSink is a message sink for a Connection.
 type TCPSink struct {
-	Conn net.Conn
+	Payload []byte
+	Conn    net.Conn
 }
 
 func (t *TCPSink) String() string {

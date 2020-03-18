@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"strconv"
 	"strings"
 	"time"
@@ -36,6 +37,12 @@ func newSinkConnection(hostname string, port string, typ string) (Sinks.MessageS
 		sinkConn = new(Sinks.UDPSink)
 	} else if typ == "mqtt" {
 		sinkConn = new(Sinks.MQTTSink)
+	} else if typ == "nats" {
+		sinkConn = new(Sinks.NATSSink)
+	} else if type == "pulsar" {
+		sinkConn = new(Sinks.PulsarSink)
+	} else {
+		return nil, errors.New("Invalid Sink")
 	}
 
 	err := sinkConn.InitiateConnection(hostname, port)

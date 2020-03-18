@@ -23,7 +23,8 @@ const (
 
 // MQTTSink is a message sink for a MQTT Connection.
 type MQTTSink struct {
-	Client mqtt.Client
+	Payload []byte
+	Client  mqtt.Client
 }
 
 func (t *MQTTSink) String() string {
@@ -73,7 +74,12 @@ func (t *MQTTSink) InitiateConnection(hostname string, port string) error {
 
 // SendPayload sends the payload via the MQTT link.
 func (t *MQTTSink) SendPayload(payload []byte) error {
-	token := t.Client.Publish(MqttDefaultTopic, 0, false, payload)
+	token := t.Client.Publish(
+		MqttDefaultTopic,
+		0,
+		false,
+		payload,
+	)
 	token.Wait()
 	if err := token.Error(); err != nil {
 		return err

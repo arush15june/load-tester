@@ -22,29 +22,12 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"runtime/pprof"
 	"sync"
-	"sync/atomic"
 	"time"
-)
 
-// Logger
-var (
-	infoLogger = log.New(os.Stdout, "INFO: ", log.Ldate|log.Ltime)
-	LogInfo    = func(data string) {
-		infoLogger.Output(2, data)
-	}
-
-	warnLogger = log.New(os.Stdout, "WARNING: ", log.Ldate|log.Ltime)
-	LogWarn    = func(data string) {
-		warnLogger.Output(2, data)
-	}
-
-	debugLogger = log.New(os.Stdout, "DEBUG: ", log.Ldate|log.Ltime)
-	LogDebug    = func(data string) {
-		if *Verbose {
-			debugLogger.Output(2, data)
-		}
-	}
+	Log "github.com/arush15june/load-tester/src/pkg/logger"
+	Args "github.com/arush15june/load-tester/src/tester/args"
 )
 
 // Global Variables
@@ -122,53 +105,71 @@ func messageRoutine(hostname string, port string, sinktype string, localMsgRateV
 	finishWaiter.Add(1)
 
 	var sendErr error
-	var start time.Time
 	var sentMsgAmt uint64
 	var exitVal = false
 
 	sinkConnection, err := newSinkConnection(hostname, port, sinktype)
 	if err != nil {
-		LogDebug(fmt.Sprintf("Failed initiating %v connection to %v:%v", sinkConnection, hostname, port))
+		Log.LogDebug(fmt.Sprintf("Failed initiating %v connection to %v:%v", sinkConnection, hostname, port))
+		Log.LogDebug(err.Error())
 		inititationWaiter.Done()
 		finishWaiter.Done()
 
 		return
 	}
+	// Works on every return of function.
+	defer func() {
+		Log.LogDebug(fmt.Sprintf("Closing %v connection to %v:%v\n", sinkConnection, hostname, port))
+		sinkConnection.CloseConnection()
+		finishWaiter.Done()
+	}()
 
-	LogDebug(fmt.Sprintf("Initiated new %v connection to %v:%v", sinkConnection, hostname, port))
-
-	secondRateTime := time.NewTimer(1 * time.Second)
+	Log.LogDebug(fmt.Sprintf("Initiated new %v connection to %v:%v", sinkConnection, hostname, port))
 
 	inititationWaiter.Done()
 	inititationWaiter.Wait()
+
+	var start time.Time
+	secondRateTime := time.NewTicker(1 * time.Second)
 	for {
-		select {
-		case <-time.After(MessageTime - time.Since(start)):
-		case <-secondRateTime.C:
-			atomic.StoreUint64(localMsgRateVar, sentMsgAmt)
-			sentMsgAmt = 0
-			secondRateTime.Reset(1 * time.Second)
-		case exitVal = <-exitChan:
-			if exitVal {
-				break
+		// Wait for rate limiter to signal start again.
+
+		if *Args.Messages < 1 {
+			select {
+			case <-secondRateTime.C:
+				*localMsgRateVar = sentMsgAmt
+				sentMsgAmt = 0
+			case exitVal = <-exitChan:
+				if exitVal {
+					return
+				}
+			default:
+			}
+
+		} else {
+			select {
+			case <-secondRateTime.C:
+				*localMsgRateVar = sentMsgAmt
+				sentMsgAmt = 0
+			case exitVal = <-exitChan:
+				if exitVal {
+					return
+				}
+			case <-time.After(MessageTime - time.Since(start)):
 			}
 		}
 
 		start = time.Now()
 		sendErr = sinkConnection.SendPayload(Payload)
 		if sendErr != nil {
-			fmt.Println(sendErr.Error())
-			atomic.StoreUint64(localMsgRateVar, 0)
+			Log.LogFatal(sendErr.Error())
+			*localMsgRateVar = 0
 			break
 		}
 
 		sentMsgAmt++
-		atomic.AddUint64(totalMsgSentVar, 1)
+		*totalMsgSentVar++
 	}
-	LogDebug(fmt.Sprintf("Closing %v connection to %v:%v\n", sinkConnection, hostname, port))
-	sinkConnection.CloseConnection()
-
-	finishWaiter.Done()
 }
 
 // deploySink adds an entry to the WaitGroup and deploys the selected sink.
@@ -184,29 +185,39 @@ func logMessageRate(signalChan chan bool, msgLogUpdateRate *time.Duration) {
 		default:
 		}
 
-		if exitVal {
-			break
+		if exitVal == true {
+			return
 		}
 
-		var sum uint64 = 0
-		for n, _ := range msgRateArr {
-			sum += atomic.LoadUint64(&msgRateArr[n])
+		Log.LogDebug(fmt.Sprintf("Messages Rate: %d", msgRateArr))
+		var sum uint64
+		for n := range msgRateArr {
+			sum += msgRateArr[n]
 		}
-		infoLogger.Printf("Message Rate: %v msg/s", sum)
+		Log.InfoLogger.Printf("Message Rate: %v msg/s", sum)
 
 		time.Sleep(*msgLogUpdateRate)
 	}
 }
 
 func main() {
-	ParseFlags()
+	Args.ParseFlags()
 
-	totalDevices := *Devices
-	totalMessagePerSecond := *Messages * float64(totalDevices)
-	msgLogUpdateRate := *UpdateRate
+	if *Args.Cpuprofile != "" {
+		f, err := os.Create(*Args.Cpuprofile)
+		if err != nil {
+			log.Fatal(err)
+		}
+		pprof.StartCPUProfile(f)
+		defer pprof.StopCPUProfile()
+	}
 
-	MessageTime = getMessageTimeDuration(*Messages)
-	Payload = generatePayload(*PayloadSize)
+	totalDevices := *Args.Devices
+	totalMessagePerSecond := *Args.Messages * float64(totalDevices)
+	msgLogUpdateRate := *Args.UpdateRate
+
+	MessageTime = getMessageTimeDuration(*Args.Messages)
+	Payload = generatePayload(*Args.PayloadSize)
 	msgRateArr = make([]uint64, totalDevices)
 	totalMsgSentArr = make([]uint64, totalDevices)
 	exitChanList = make([]chan bool, totalDevices)
@@ -214,46 +225,47 @@ func main() {
 		exitChanList[i] = make(chan bool)
 	}
 
-	LogInfo(fmt.Sprintf("Messages per device per second: %f/s\n", *Messages))
-	LogInfo(fmt.Sprintf("Total messages per second: %f/s\n", totalMessagePerSecond))
-	LogInfo(fmt.Sprintf("Message Delta: %v\n", MessageTime))
-	LogInfo(fmt.Sprintf("Payload Size: %v bytes\n", *PayloadSize))
-	LogInfo(fmt.Sprintf("Run Timer: %v\n", *Timer))
+	Log.LogInfo(fmt.Sprintf("Messages per device per second: %f/s\n", *Args.Messages))
+	Log.LogInfo(fmt.Sprintf("Total messages per second: %f/s\n", totalMessagePerSecond))
+	Log.LogInfo(fmt.Sprintf("Message Delta: %v\n", MessageTime))
+	Log.LogInfo(fmt.Sprintf("Payload Size: %v bytes\n", *Args.PayloadSize))
+	Log.LogInfo(fmt.Sprintf("Run Timer: %v\n", *Args.Timer))
+	Log.LogInfo(fmt.Sprintf("Sink: %v\n", *Args.SinkType))
 
-	LogInfo(fmt.Sprintf("Ramping up %d workers.\n", totalDevices))
-	if !*NoExecute {
+	Log.LogInfo(fmt.Sprintf("Ramping up %d workers.\n", totalDevices))
+	if !*Args.NoExecute {
 		for i := range exitChanList {
 			routineMsgRateVar := &msgRateArr[i]
 			routineExitChanVar := exitChanList[i]
 			routineMsgSentVar := &totalMsgSentArr[i]
-			deploySink(*Hostname, *Port, *SinkType, routineMsgRateVar, routineMsgSentVar, routineExitChanVar)
+			deploySink(*Args.Hostname, *Args.Port, *Args.SinkType, routineMsgRateVar, routineMsgSentVar, routineExitChanVar)
 		}
 	}
 
 	inititationWaiter.Wait()
-	LogInfo(fmt.Sprintf("Started %d workers.\n", totalDevices))
+	Log.LogInfo(fmt.Sprintf("Started %d workers.\n", totalDevices))
 
 	updateExitSignalChan := make(chan bool)
 	go logMessageRate(updateExitSignalChan, &msgLogUpdateRate)
 
-	LogDebug(string(*Timer))
-	if *Timer > 0*time.Second {
-		exitTimer := time.NewTimer(*Timer)
+	Log.LogDebug(fmt.Sprintf("Timer: %v", *Args.Timer))
+	if *Args.Timer > 0*time.Second {
+		exitTimer := time.NewTimer(*Args.Timer)
 		select {
 		case <-exitTimer.C:
 			updateExitSignalChan <- true
 			for chanIndex := range exitChanList {
 				exitChanList[chanIndex] <- true
 			}
-			LogInfo("Timer finish.")
+			Log.LogInfo("Timer finish.")
 		}
 	}
 
 	finishWaiter.Wait()
 
-	var msgSum uint64 = 0
+	var msgSum uint64
 	for i := range totalMsgSentArr {
 		msgSum += totalMsgSentArr[i]
 	}
-	LogInfo(fmt.Sprintf("Total messages sent: %v\n", msgSum))
+	Log.LogInfo(fmt.Sprintf("Total messages sent: %v\n", msgSum))
 }
