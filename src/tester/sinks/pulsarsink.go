@@ -15,8 +15,8 @@ const (
 // PulsarSink is a message sink for a NATS Subscription.
 type PulsarSink struct {
 	Payload  []byte
-	Client   *pulsar.Client
-	Producer *pulsar.Producer
+	Client   pulsar.Client
+	Producer pulsar.Producer
 }
 
 func (t *PulsarSink) String() string {
@@ -43,7 +43,8 @@ func (t *PulsarSink) InitiateConnection(hostname string, port string) error {
 		return err
 	}
 
-	t.Client = producer
+	t.Client = client
+	t.Producer = producer
 
 	return nil
 }
@@ -54,7 +55,7 @@ func (t *PulsarSink) SendPayload(payload []byte) error {
 		Payload: payload,
 	}
 
-	err := t.Client.Send(context.Background(), msg)
+	err := t.Producer.Send(context.Background(), msg)
 	return err
 }
 

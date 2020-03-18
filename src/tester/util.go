@@ -39,7 +39,7 @@ func newSinkConnection(hostname string, port string, typ string) (Sinks.MessageS
 		sinkConn = new(Sinks.MQTTSink)
 	} else if typ == "nats" {
 		sinkConn = new(Sinks.NATSSink)
-	} else if type == "pulsar" {
+	} else if typ == "pulsar" {
 		sinkConn = new(Sinks.PulsarSink)
 	} else {
 		return nil, errors.New("Invalid Sink")
