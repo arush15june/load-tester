@@ -2,6 +2,7 @@ package sinks
 
 import (
 	"fmt"
+	"time"
 	nats "github.com/nats-io/nats.go"
 )
 
@@ -32,9 +33,9 @@ func (t *NATSSink) InitiateConnection(hostname string, port string) error {
 }
 
 // SendPayload publishes a NATS payload.
-func (t *NATSSink) SendPayload(payload []byte) error {
+func (t *NATSSink) SendPayload(payload []byte) (time.Time, error) {
 	err := t.Client.Publish(NatsDefaultSubject, payload)
-	return err
+	return time.Now(), err
 }
 
 // CloseConnection closes the NATS connection.

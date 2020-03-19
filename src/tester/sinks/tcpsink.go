@@ -1,6 +1,9 @@
 package sinks
 
-import "net"
+import (
+	"net"
+	"time"
+)
 
 // TCPSink is a message sink for a Connection.
 type TCPSink struct {
@@ -24,9 +27,9 @@ func (t *TCPSink) InitiateConnection(hostname string, port string) error {
 }
 
 // SendPayload sends the payload via the TCP link.
-func (t *TCPSink) SendPayload(payload []byte) error {
+func (t *TCPSink) SendPayload(payload []byte) (time.Time, error) {
 	_, err := t.Conn.Write(payload)
-	return err
+	return time.Now(), err
 }
 
 // CloseConnection closes the TCP link.

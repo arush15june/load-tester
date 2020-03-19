@@ -73,7 +73,7 @@ func (t *MQTTSink) InitiateConnection(hostname string, port string) error {
 }
 
 // SendPayload sends the payload via the MQTT link.
-func (t *MQTTSink) SendPayload(payload []byte) error {
+func (t *MQTTSink) SendPayload(payload []byte) (time.Time, error) {
 	token := t.Client.Publish(
 		MqttDefaultTopic,
 		0,
@@ -82,9 +82,9 @@ func (t *MQTTSink) SendPayload(payload []byte) error {
 	)
 	token.Wait()
 	if err := token.Error(); err != nil {
-		return err
+		return time.Now(), err
 	}
-	return nil
+	return time.Now(), nil
 }
 
 // CloseConnection closes the MQTT link.

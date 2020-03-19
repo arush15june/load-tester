@@ -1,6 +1,9 @@
 package sinks
 
-import "net"
+import (
+	"net"
+	"time"
+)
 
 // UDPSink is a message sink for a Connection.
 type UDPSink struct {
@@ -24,9 +27,9 @@ func (t *UDPSink) InitiateConnection(hostname string, port string) error {
 }
 
 // SendPayload sends the payload via the UDP link.
-func (t *UDPSink) SendPayload(payload []byte) error {
+func (t *UDPSink) SendPayload(payload []byte) (time.Time, error) {
 	_, err := t.Conn.Write(payload)
-	return err
+	return time.Now(), err
 }
 
 // CloseConnection closes the UDP link.

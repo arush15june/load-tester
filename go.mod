@@ -8,4 +8,5 @@ require (
 	github.com/nats-io/nats-server/v2 v2.1.4 // indirect
 	github.com/nats-io/nats.go v1.9.1
 	golang.org/x/net v0.0.0-20190813141303-74dc4d7220e7 // indirect
+	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
 )

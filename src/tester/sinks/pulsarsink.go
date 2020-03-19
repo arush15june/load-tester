@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"runtime"
+	"time"
 
 	"github.com/apache/pulsar/pulsar-client-go/pulsar"
 )
@@ -50,13 +51,13 @@ func (t *PulsarSink) InitiateConnection(hostname string, port string) error {
 }
 
 // SendPayload publishes a NATS payload.
-func (t *PulsarSink) SendPayload(payload []byte) error {
+func (t *PulsarSink) SendPayload(payload []byte) (time.Time, error) {
 	msg := pulsar.ProducerMessage{
 		Payload: payload,
 	}
 
 	err := t.Producer.Send(context.Background(), msg)
-	return err
+	return time.Now(), err
 }
 
 // CloseConnection closes the NATS connection.
